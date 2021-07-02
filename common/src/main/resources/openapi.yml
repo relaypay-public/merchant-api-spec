@@ -1,10 +1,24 @@
 openapi: 3.0.1
 info:
   title: RelayPay-Api-Spec
-  description: The specification of RelayPay's API.
+  description: |-
+    Relay Pay API documentation. Use `sandbox-api.relaypay.io` for Sandbox environment and `api.relaypay.io` for production.
+
+    Some useful links:
+    - [Official docs](https://relaypay-merchant.readme.io/reference/merchant-native-integration)
+  contact:
+    email: support@relaypay.io
+  license:
+    name: GPLv3
   version: 0.0.2
 servers:
-  - url: https://sandbox-api.relaypay.io
+    - url: https://{environment}.relaypay.io/api/v1
+      variables:
+        environment:
+          enum:
+            - sandbox-api
+            - api
+          default: sandbox-api
 tags:
   - name: Merchant Signature Testing
     description: Works in sandbox environment only
