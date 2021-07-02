@@ -2,42 +2,37 @@ openapi: 3.0.1
 info:
   title: RelayPay-Api-Spec
   description: The specification of RelayPay's API.
-  version: 0.0.1
+  version: 0.0.2
 servers:
-- url: https://sandbox-api.relaypay.io
-
-# ---- custody ----
-# regarding the RelayPay custody solution of tokens and fiat.
+  - url: https://sandbox-api.relaypay.io
 tags:
-- name: merchant-transaction
-  description: regarding merchant transactions
+  - name: Merchant Signature Testing
+    description: Works in sandbox environment only
+  - name: E-Commerce
+    description: E-Commerce API endpoints
 
 paths:
 
-# ---- merchant transaction ----
-
-  /api/v1/merchants/generate-sign/{privateKey}:
+  '/api/v1/merchants/generate-sign/{privateKey}':
     post:
       tags:
-      - merchant-transaction
-      summary: >-
-        generate header signature SHA 256 of stringify payload + private key
-      description: This is for testing purpose only for developers and not to be used in integration
+        - Merchant Signature Testing
+      summary: Testing header signature generation. Not to be used in the actual merchant implementation. This method is a convenience for a developer to verify that his sign function generates the same header as we do.
       operationId: generateSign
       parameters:
         - name: privateKey
           in: path
           required: true
-          description: your generated private key
+          description: your private(secret) key from Relaypay
           schema:
             type: string
-      x-codegen-request-body-name: TransactionDto
+      x-codegen-request-body-name: payload
       requestBody:
         description: payload for the transaction
         content:
           'application/json':
             schema:
-              $ref: '#/components/schemas/TransactionDto'
+              type: string
       responses:
         200:
           description: SHA 256 Sign
@@ -45,201 +40,281 @@ paths:
             'text/plain':
               schema:
                 type: string
-                description: SHA 256 Sign
                 example: 44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a
-          
-  /api/v1/ecommerce/request:
+  '/api/v1/ecommerce/request':
     post:
       tags:
-      - merchant-transaction
-      summary: >-
-        request to create a new transaction
-      description: Begin a transaction. Returns a URL used by the customer to complete the transaction.
-      operationId: ecommerceRequest
+        - E-Commerce
+      summary: Ecommerce provider pushes a transaction request. The service returns a unique url to be used for redirection.
+      description: Use this endpoint to create a payment request
+      operationId: setEcommerceRequest
       parameters:
         - name: Sign
           in: header
           required: true
-          description: SHA 256 of stringify payload + private key
           schema:
             type: string
             example: 44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a
-      x-codegen-request-body-name: TransactionDto
+      x-codegen-request-body-name: EcommerceIncomingRequest
       requestBody:
-        description: object required to create merchant transaction
         content:
-          'application/json':
+          application/json:
             schema:
-              $ref: '#/components/schemas/TransactionDto'
-      responses: 
-        200:
-          $ref: '#/components/responses/RedirectUrlResponse'
-        401:
-          description: Unauthorised Request Check your public and private keys, check signing process.
+              $ref: '#/components/schemas/EcommerceIncomingRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/EcommerceResponse'
+        '400':
+          description: Bad Request
+        '401':
+          description: Unauthorised Request
 
-  /api/v1/merchant/transaction/history:
+  '/api/v1/ecommerce/salesforce':
+    post:
+      tags:
+        - E-Commerce
+      summary: Ecommerce provider pushes a Salesforce specific data for authorisation.
+      description: Use this endpoint to update Salesforce private key
+      operationId: setEcommerceSalesforce
+      parameters:
+        - name: Sign
+          in: header
+          required: true
+          schema:
+            type: string
+      x-codegen-request-body-name: MerchantSalesforcePlugin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MerchantSalesforcePlugin'
+      responses:
+        '200':
+          description: Success
+        '400':
+          description: Bad Request
+        '401':
+          description: Unauthorised Request
+
+  '/api/v1/merchant/transaction':
     get:
       tags:
-      - merchant-transaction
-      summary: >-
-        get transactions list
-      operationId: getMerchantTxs
+        - E-Commerce
+      summary: Get merchant transaction for a given merchantId by a specified orderId
+      description: Use this endpoint to retrieve merchant transaction by merchantId and orderId
+      operationId: getMerchantTransaction
       parameters:
-        - name: public-key
+        - name: Authorization
+          description: Your public key
           in: header
-          description: authorization
           required: true
           schema:
             type: string
         - name: merchantId
           in: query
-          description: merchant email (login)
           required: true
+          description: merchantID obtained from Relaypay
+          schema:
+            type: string
+        - name: orderId
+          in: query
+          required: true
+          description: Your unique reference for this payment. i.e. id of the current shopping cart
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EcommerceMerchantTransaction'
+        '400':
+          description: Bad Request
+        '401':
+          description: Unauthorised Request
+
+  '/api/v1/merchant/transaction/history':
+    get:
+      tags:
+        - E-Commerce
+      summary: Get all bill payment transactions for the merchant
+      description: Use this endpoint to retrieve transaction history
+      operationId: getMerchantTxs
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Your public key
+          schema:
+            type: string
+        - name: merchantId
+          in: query
+          required: true
+          description: merchantID obtained from Relaypay
           schema:
             type: string
         - name: page
           in: query
-          description: number of page
           required: true
+          description: Starts from 0
           schema:
             type: integer
             format: int32
         - name: size
           in: query
-          description: amount of the elements on the page
           required: true
+          description: how many records to be returned
           schema:
             type: integer
             format: int32
       responses:
-        200:
-          $ref: '#/components/responses/PageEcommerceMerchantTransactionResponse'
-          
-  /api/v1/merchant/transaction:
-    get:
-      tags:
-      - merchant-transaction
-      summary: >-
-        get transaction my merchant id and order id
-      operationId: getMerchantTx
-      parameters:
-        - name: public-key
-          in: header
-          description: authorization
-          required: true
-          schema:
-            type: string
-        - name: merchantId
-          in: query
-          description: merchant email (login)
-          required: true
-          schema:
-            type: string
-        - name: orderId
-          in: query
-          description: unique merchant orderId
-          required: true
-          schema:
-            type: string
-      responses:
-        200:
-          $ref: '#/components/responses/EcommerceMerchantTransactionResponse'
+        '200':
+          description: Success
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PageEcommerceMerchantTransaction'
+        '400':
+          description: Bad Request
+        '401':
+          description: Unauthorised Request
+
 
 # ---- definitions ----
 
 components:
 
-  responses:
-    Confirmation:
-      description: A confirmation of the action
-  
-    RedirectUrlResponse:
-      description: A url to redirect once transaction created
-      content:
-        text/plain:
-          schema:
-            $ref: '#/components/schemas/callbackUrlRedirect'
-            
-    EcommerceMerchantTransactionResponse:
-      description: transaction object
-      content:
-        'application/json':
-          schema:
-            $ref: '#/components/schemas/EcommerceMerchantTransaction'
-    
-    PageEcommerceMerchantTransactionResponse:
-      description: response of transaction history
-      content:
-        'application/json':
-          schema:
-            $ref: '#/components/schemas/PageEcommerceMerchantTransaction'
-  
   schemas:
-    # ---- enums ----
-    Currency:
-      type: string
-      enum:
-      - AUD
-      - USD
-      - EUR
-      
-    callbackUrlRedirect:
-      type: string
-      example: 'url'
-      description: Where to redirect once the payment is pending or cancelled. If this value is provided, it will override the fallback option provided in the general settings accessed through the merchant dashboard.
-    
-    Sort:
+    EcommerceResponse:
       type: object
       properties:
-        unsorted:
-          type: boolean
-        sorted:
-          type: boolean
-        empty:
-          type: boolean
-    
-    Pageable:
+        redirectionUrl:
+          type: string
+          description: Redirect to this URL for payment. The token in the url is a unique identifier of the registered order details.
+          example: https://relaypay.io/...
+      description: E-commerce Transaction Response
+
+    MerchantSalesforcePlugin:
       type: object
       properties:
-        offset:
-          type: integer
-          format: int32
-        sort:
-          $ref: '#/components/schemas/Sort'
-        paged:
-          type: boolean
-        unpaged:
-          type: boolean
-        pageNumber:
-          type: integer
-          format: int32
-        pageSize:
-          type: integer
-          format: int32
-      
+        merchantId:
+          type: string
+          description: merchantID obtained from Relaypay
+        issuer:
+          type: string
+          description: Salesforce OAuth specific
+        subject:
+          type: string
+          description: Salesforce OAuth specific
+        audience:
+          type: string
+          description: Salesforce OAuth specific
+        url:
+          type: string
+          description: Salesforce OAuth login url
+        privateKey:
+          type: string
+          description: privateKey exported from Salesforce
+
+    EcommerceIncomingRequest:
+      required:
+        - callbackUrlRedirect
+      type: object
+      properties:
+        amount:
+          type: number
+          example: 5
+        customerName:
+          type: string
+          example: Jacob
+        customerEmail:
+          type: string
+          example: info@gmail.com
+        storeName:
+          type: string
+          example: relayPay
+        merchantId:
+          type: string
+          description: merchantID obtained from Relaypay
+          example: RELAYPAY001
+        currency:
+          type: string
+          example: AUD
+          description: Currency corresponding to the amountt given. Must be the currency approved for this merchant.
+        orderId:
+          type: string
+          description: Your unique reference for this payment. i.e. id of the current shopping cart
+        callbackUrlRedirect:
+          type: string
+          description: Where to redirect once the payment is pending or cancelled. If this value is provided it'll override the general settings.
+        callbackCancelUrlRedirect:
+          type: string
+          description: Where to redirect once the payment is cancelled. If this value is not provided callbackUrlRedirect will be used
+        webHookUrl:
+          type: string
+          description: Where to post updates about a payment. These will be posted with every payment change. This callback is guaranteed to happen before we redirect the user back. If this value is provided it'll override the general settings. If not provide at all - webhook will not send
+        securityToken:
+          type: string
+          description: 'This token will be sent back with the callback in Authorization header. (Authorization:  [type] [credentials]  (e.x Basic Rjc1234567890jdGMS67890U78...)) When creating the token, both ''type'' and ''credentials'' are required.'
+      description: E-commerce Transaction Request
+
     EcommerceMerchantTransaction:
       type: object
       properties:
         orderId:
           type: string
+          description: Your unique reference for this payment. i.e. id of the current shopping cart
         transactionId:
           type: string
+          description: Relaypay internal ID
         orderStatus:
           type: string
+          enum:
+            - Cancelled
+            - Success
+            - Failed
+            - Pending
         customerEmail:
           type: string
         customerName:
           type: string
         amount:
+          type: number
+        currency:
           type: string
-      
+          enum:
+            - AUD
+            - USD
+            - EUR
+            - CAD
+            - CHF
+            - CNY
+            - GBP
+            - JPY
+            - HKD
+            - INR
+            - NZD
+            - PHP
+            - SGD
+            - TRY
+            - AED
+            - SEK
+            - THB
+            - ZAR
+      description: E-commerce Payment Update Info
+
     PageEcommerceMerchantTransaction:
       type: object
       properties:
-        totalPages:
-          type: integer
-          format: int32
         totalElements:
+          type: integer
+          format: int64
+        totalPages:
           type: integer
           format: int32
         size:
@@ -254,51 +329,41 @@ components:
           format: int32
         sort:
           $ref: '#/components/schemas/Sort'
+        first:
+          type: boolean
         numberOfElements:
           type: integer
           format: int32
-        first:
-          type: boolean
-        last:
-          type: boolean
         pageable:
           $ref: '#/components/schemas/Pageable'
+        last:
+          type: boolean
         empty:
           type: boolean
-
-    # ---- dtos ----
-    TransactionDto:
+    Pageable:
       type: object
-      required:
-      - amount
-      - customerName
-      - customerEmail
-      - storeName
-      - merchantId
-      - currency
-      - orderId
       properties:
-        amount:
-          type: number
-          format: float
-        customerName:
-          type: string
-        customerEmail:
-          type: string
-        storeName:
-          type: string
-        merchantId:
-          type: string
-          description: merchant email (login)
-        currency:
-          $ref: '#/components/schemas/Currency'
-        orderId:
-          type: string
-          description: Id generated on the merchant side. Will be returned in webhook payload.
-        callbackUrlRedirect:
-          $ref: '#/components/schemas/callbackUrlRedirect'
-        webHookUrl:
-          type: string
-          description: Where to post updates about a payment. These will be posted with every payment change. This callback is guaranteed to happen before we redirect the user back.
-            If this value is provided, it will override the fallback option provided in the general settings accessed through the merchant dashboard.
-            Setting this value in the general settings is also optional. If neither place is filled in then the webhook will not be sent.
+        offset:
+          type: integer
+          format: int64
+        sort:
+          $ref: '#/components/schemas/Sort'
+        pageNumber:
+          type: integer
+          format: int32
+        pageSize:
+          type: integer
+          format: int32
+        unpaged:
+          type: boolean
+        paged:
+          type: boolean
+    Sort:
+      type: object
+      properties:
+        sorted:
+          type: boolean
+        unsorted:
+          type: boolean
+        empty:
+          type: boolean
