@@ -12,13 +12,13 @@ info:
     name: GPLv3
   version: 0.0.2
 servers:
-    - url: https://{environment}.relaypay.io/api/v1
-      variables:
-        environment:
-          enum:
-            - sandbox-api
-            - api
-          default: sandbox-api
+  - url: https://{environment}.relaypay.io/api/v1
+    variables:
+      environment:
+        enum:
+          - sandbox-api
+          - api
+        default: sandbox-api
 tags:
   - name: Merchant Signature Testing
     description: Works in sandbox environment only
@@ -62,13 +62,6 @@ paths:
       summary: Ecommerce provider pushes a transaction request. The service returns a unique url to be used for redirection.
       description: Use this endpoint to create a payment request
       operationId: setEcommerceRequest
-      parameters:
-        - name: Sign
-          in: header
-          required: true
-          schema:
-            type: string
-            example: 44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a
       x-codegen-request-body-name: EcommerceIncomingRequest
       requestBody:
         content:
@@ -86,7 +79,9 @@ paths:
           description: Bad Request
         '401':
           description: Unauthorised Request
-
+      security:
+        - sign:
+            - 'write:transaction'
   '/api/v1/ecommerce/salesforce':
     post:
       tags:
@@ -94,12 +89,6 @@ paths:
       summary: Ecommerce provider pushes a Salesforce specific data for authorisation.
       description: Use this endpoint to update Salesforce private key
       operationId: setEcommerceSalesforce
-      parameters:
-        - name: Sign
-          in: header
-          required: true
-          schema:
-            type: string
       x-codegen-request-body-name: MerchantSalesforcePlugin
       requestBody:
         content:
@@ -113,6 +102,9 @@ paths:
           description: Bad Request
         '401':
           description: Unauthorised Request
+      security:
+        - sign:
+            - 'write:transaction'
 
   '/api/v1/merchant/transaction':
     get:
@@ -122,12 +114,6 @@ paths:
       description: Use this endpoint to retrieve merchant transaction by merchantId and orderId
       operationId: getMerchantTransaction
       parameters:
-        - name: Authorization
-          description: Your public key
-          in: header
-          required: true
-          schema:
-            type: string
         - name: merchantId
           in: query
           required: true
@@ -151,7 +137,9 @@ paths:
           description: Bad Request
         '401':
           description: Unauthorised Request
-
+      security:
+        - authorization:
+            - 'write:transaction'
   '/api/v1/merchant/transaction/history':
     get:
       tags:
@@ -160,12 +148,6 @@ paths:
       description: Use this endpoint to retrieve transaction history
       operationId: getMerchantTxs
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          description: Your public key
-          schema:
-            type: string
         - name: merchantId
           in: query
           required: true
@@ -197,6 +179,9 @@ paths:
           description: Bad Request
         '401':
           description: Unauthorised Request
+      security:
+        - authorization:
+            - 'write:transaction'
 
 
 # ---- definitions ----
@@ -381,3 +366,12 @@ components:
           type: boolean
         empty:
           type: boolean
+  securitySchemes:
+    sign:
+      type: apiKey
+      name: Sign
+      in: header
+    authorization:
+      type: apiKey
+      name: Authorization
+      in: header
