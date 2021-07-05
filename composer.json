@@ -1,5 +1,5 @@
 {
-    "name": "relaypay/merchant-api-spec",
+    "name": "relaypay-official/merchant-api-spec",
     "description": "RelayPay Merchant API OpenAPI specification",
     "require": {}
 }
