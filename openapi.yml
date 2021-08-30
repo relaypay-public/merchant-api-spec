@@ -12,7 +12,7 @@ info:
     name: GPLv3
   version: 0.0.2
 servers:
-  - url: https://{environment}.relaypay.io/api/v1
+  - url: https://{environment}.relaypay.io
     variables:
       environment:
         enum:
